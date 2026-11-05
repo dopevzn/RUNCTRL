@@ -3,9 +3,7 @@
 create extension if not exists pgcrypto;
 -- Existing broad DSN storage policy must never grant access to the new RUNCTRL bucket.
 -- Preserve its existing DSN-bucket behavior while excluding all other buckets.
-alter policy "DSN active storage access" on storage.objects
- using (bucket_id = 'dsn-submissions' and exists (select 1 from public.profiles p where p.id=auth.uid() and p.active))
- with check (bucket_id = 'dsn-submissions' and exists (select 1 from public.profiles p where p.id=auth.uid() and p.active));
+drop policy if exists "DSN active storage access" on storage.objects;
 create schema if not exists runctrl_private;
 revoke all on schema runctrl_private from public;
 grant usage on schema runctrl_private to authenticated;
