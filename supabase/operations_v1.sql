@@ -1,6 +1,11 @@
 -- RUNCTRL Operations v1. Namespaced tables do not alter DSN newsroom records.
 -- Intended for the existing active DSN Newsroom Supabase project as an initial shared backend.
 create extension if not exists pgcrypto;
+-- Existing broad DSN storage policy must never grant access to the new RUNCTRL bucket.
+-- Preserve its existing DSN-bucket behavior while excluding all other buckets.
+alter policy "DSN active storage access" on storage.objects
+ using (bucket_id = 'dsn-submissions' and exists (select 1 from public.profiles p where p.id=auth.uid() and p.active))
+ with check (bucket_id = 'dsn-submissions' and exists (select 1 from public.profiles p where p.id=auth.uid() and p.active));
 create schema if not exists runctrl_private;
 revoke all on schema runctrl_private from public;
 grant usage on schema runctrl_private to authenticated;
@@ -267,3 +272,75 @@ create policy "RUNCTRL uploader and editors can download" on storage.objects for
   or exists(select 1 from public.rc_members m where m.workspace_id::text=(storage.foldername(name))[1]
    and m.user_id=(select auth.uid()) and m.role in ('owner','editor'))
  ));
+
+-- Immutable record boundaries prevent cross-workspace reparenting through UPDATE.
+create or replace function runctrl_private.prevent_reparent()
+returns trigger language plpgsql security invoker set search_path = ''
+as $$
+begin
+ if tg_table_name='rc_assignments' and (new.workspace_id <> old.workspace_id or new.created_by <> old.created_by) then
+  raise exception 'Assignment workspace and creator are immutable';
+ elsif tg_table_name='rc_credentials' and (new.workspace_id <> old.workspace_id or new.assignment_id <> old.assignment_id) then
+  raise exception 'Credential parent is immutable';
+ elsif tg_table_name='rc_submissions' and (new.workspace_id <> old.workspace_id or new.assignment_id <> old.assignment_id or new.uploaded_by <> old.uploaded_by) then
+  raise exception 'Submission parent is immutable';
+ elsif tg_table_name='rc_assets' and (new.workspace_id <> old.workspace_id or new.submission_id <> old.submission_id or new.uploader_id <> old.uploader_id or new.storage_path <> old.storage_path) then
+  raise exception 'Asset identity is immutable';
+ elsif tg_table_name='rc_members' and (new.workspace_id <> old.workspace_id or new.user_id <> old.user_id) then
+  raise exception 'Member identity is immutable';
+ elsif tg_table_name='rc_access_requests' and (new.workspace_id <> old.workspace_id or new.user_id <> old.user_id or new.email <> old.email) then
+  raise exception 'Access request identity is immutable';
+ end if;
+ return new;
+end $$;
+revoke all on function runctrl_private.prevent_reparent() from public;
+create trigger rc_assignment_immutable before update on public.rc_assignments for each row execute function runctrl_private.prevent_reparent();
+create trigger rc_credential_immutable before update on public.rc_credentials for each row execute function runctrl_private.prevent_reparent();
+create trigger rc_submission_immutable before update on public.rc_submissions for each row execute function runctrl_private.prevent_reparent();
+create trigger rc_asset_immutable before update on public.rc_assets for each row execute function runctrl_private.prevent_reparent();
+create trigger rc_member_immutable before update on public.rc_members for each row execute function runctrl_private.prevent_reparent();
+create trigger rc_access_immutable before update on public.rc_access_requests for each row execute function runctrl_private.prevent_reparent();
+
+-- Keep credential parent and submission parent in the right workspace.
+create or replace function runctrl_private.validate_parent_workspace()
+returns trigger language plpgsql security invoker set search_path = ''
+as $$
+begin
+ if not exists(select 1 from public.rc_assignments a where a.id=new.assignment_id and a.workspace_id=new.workspace_id) then
+  raise exception 'Assignment does not belong to workspace';
+ end if;
+ return new;
+end $$;
+revoke all on function runctrl_private.validate_parent_workspace() from public;
+create trigger rc_credential_parent before insert on public.rc_credentials for each row execute function runctrl_private.validate_parent_workspace();
+create trigger rc_submission_parent before insert on public.rc_submissions for each row execute function runctrl_private.validate_parent_workspace();
+
+create or replace function runctrl_private.validate_asset_parent()
+returns trigger language plpgsql security invoker set search_path = ''
+as $$
+begin
+ if not exists(select 1 from public.rc_submissions s where s.id=new.submission_id and s.workspace_id=new.workspace_id and s.uploaded_by=new.uploader_id) then
+  raise exception 'Asset parent is invalid';
+ end if;
+ return new;
+end $$;
+revoke all on function runctrl_private.validate_asset_parent() from public;
+create trigger rc_asset_parent before insert on public.rc_assets for each row execute function runctrl_private.validate_asset_parent();
+
+create or replace function runctrl_private.validate_submission_release()
+returns trigger language plpgsql security invoker set search_path = ''
+as $$
+begin
+ if new.status in ('approved','published') and old.status <> new.status then
+  if not new.rights_attested or not exists(
+    select 1 from public.rc_assets a where a.submission_id=new.id
+  ) or exists(
+    select 1 from public.rc_assets a where a.submission_id=new.id
+    and (a.review_status <> 'approved' or a.rights_status <> 'cleared')
+  ) then raise exception 'Cannot approve or publish without cleared assets';
+  end if;
+ end if;
+ return new;
+end $$;
+revoke all on function runctrl_private.validate_submission_release() from public;
+create trigger rc_submission_release before update on public.rc_submissions for each row execute function runctrl_private.validate_submission_release();
