@@ -99,7 +99,17 @@ export default function Home(){
  },[client,workspace,myRole]);
  useEffect(()=>{setAssignments([]);setCredentials([]);setSubmissions([]);setAssets([]);setRequests([]);setDraft(initialDraft);setNewAssignment(false);setCredentialFor('');setSubmissionFor('');setUploadFiles([]);setFileFor('');setRightsNotes({});if(myRole)fetchWorkspace().catch(e=>{setDataLoading(false);setNotice(errorText(e))});return()=>{fetchSequence.current++}},[fetchWorkspace,myRole]);
  async function act(fn:()=>Promise<void>,message:string){setBusy(true);setNotice('');try{await fn();setNotice(message);await load();await fetchWorkspace()}catch(e){setNotice(errorText(e))}finally{setBusy(false)}}
- async function signIn(){if(!client)return;const {error}=await client.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.origin+'/'}});if(error)setNotice(error.message)}
+ async function signIn(){
+  if(!client)return;
+  setBusy(true);setNotice('');
+  try{
+   const response=await fetch(process.env.NEXT_PUBLIC_SUPABASE_URL+'/auth/v1/settings',{headers:{apikey:process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}});
+   if(!response.ok)throw new Error('Sign-in is temporarily unavailable. Please try again later.');
+   const settings=await response.json();
+   if(!settings.external?.google)throw new Error('Google sign-in is not available yet. Contact your workspace owner.');
+   const {error}=await client.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.origin+'/'}});if(error)throw error;
+  }catch(e){setNotice(errorText(e))}finally{setBusy(false)}
+ }
  async function requestAccess(w:Workspace){
   if(!client||!user?.email||!user.id)return;
   await act(async()=>{const {error}=await client.from('rc_access_requests').insert({workspace_id:w.id,user_id:user.id,email:user.email,requested_role:'contributor',status:'pending'});if(error)throw error},'Request recorded for administrator review.');
@@ -202,7 +212,7 @@ export default function Home(){
    <div className="auth">{user?.email&&<small>{user.email}</small>}{user?<button onClick={()=>client?.auth.signOut()}>Sign out</button>:null}</div></header>
    {notice&&<div className="notice" role="status">{notice}<button onClick={()=>setNotice('')} aria-label="Dismiss notice">×</button></div>}
    {loading?<div className="empty">Loading your workspace…</div>:!user?
-    <div className="empty welcome"><div className="eyebrow">THE OPERATING SYSTEM FOR MEDIA TEAMS</div><h2>Run the work. Own the outcome.</h2><p>Secure access for contributors, editors, and owners.</p><button className="primary" onClick={signIn} disabled={!client}>Continue with Google</button></div>
+    <div className="empty welcome"><div className="eyebrow">THE OPERATING SYSTEM FOR MEDIA TEAMS</div><h2>Run the work. Own the outcome.</h2><p>Use the Google account approved by your workspace owner.</p><button className="primary" onClick={signIn} disabled={!client||busy}>Continue with Google</button></div>
    :!available.length?<div className="panel"><h2>Request workspace access</h2><p>Your account is signed in, but no active workspace membership has been granted. Choose a team to request access. An owner must approve you.</p><div className="stack">{workspaces.map(w=><div className="assignment" key={w.id}><div><strong>{w.name}</strong><p>Contributor access requires approval.</p></div><button className="primary" disabled={busy||ownRequests.some(r=>r.workspace_id===w.id&&r.user_id===user.id)} onClick={()=>requestAccess(w)}>{ownRequests.find(r=>r.workspace_id===w.id)?pretty(ownRequests.find(r=>r.workspace_id===w.id)!.status):'Request access'}</button></div>)}</div></div>
    :<>
     <div className="rc-strip"><span className="rc-chip">{pretty(myRole||'member')} access</span><span className="rc-chip">Private workspace</span><button onClick={()=>fetchWorkspace().catch(e=>setNotice(errorText(e)))} className="soft-button">↻ Refresh</button></div>
