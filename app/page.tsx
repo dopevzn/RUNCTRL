@@ -90,7 +90,7 @@ export default function Home(){
  async function signIn(){if(!client)return;const {error}=await client.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.origin}});if(error)setNotice(error.message)}
  async function requestAccess(w:Workspace){
   if(!client||!user?.email||!user.id)return;
-  await act(async()=>{const {error}=await client.from('rc_access_requests').upsert({workspace_id:w.id,user_id:user.id,email:user.email,requested_role:'contributor',status:'pending'},{onConflict:'workspace_id,user_id'});if(error)throw error},'Request recorded for administrator review.');
+  await act(async()=>{const {error}=await client.from('rc_access_requests').insert({workspace_id:w.id,user_id:user.id,email:user.email,requested_role:'contributor',status:'pending'});if(error)throw error},'Request recorded for administrator review.');
  }
  async function createAssignment(){
   if(!client||!user||!workspace)return;
@@ -169,7 +169,7 @@ export default function Home(){
  async function approveAccess(r:AccessRequest){
   if(!client||!isOwner)return;
   await act(async()=>{
-   const mem=await client.from('rc_members').upsert({workspace_id:workspace,user_id:r.user_id,role:r.requested_role},{onConflict:'workspace_id,user_id'});
+   const mem=await client.from('rc_members').insert({workspace_id:workspace,user_id:r.user_id,role:r.requested_role});
    if(mem.error)throw mem.error;
    const upd=await client.from('rc_access_requests').update({status:'approved',resolved_at:new Date().toISOString()}).eq('id',r.id);
    if(upd.error)throw upd.error;
