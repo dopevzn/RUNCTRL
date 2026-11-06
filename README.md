@@ -4,8 +4,7 @@ Multi-workspace media operations for DOPE Sports Network, RecruitLook Hoops and 
 
 ## Current release state
 
-The feature branch builds and its Preview deployment is READY. **Production promotion is withheld:** Google OAuth is disabled in the shared Supabase project and has no client credentials configured. The real browser sign-in test returned `Unsupported provider: provider is not enabled`. Authenticated browser upload and review tests cannot pass that gate yet.
-
+The feature branch builds and Google OAuth is enabled. Owner login, assignment and credential approval, private upload/download, rights clearance, package approval and workspace switching passed browser QA. Production remains gated on PKCE sign-in and contributor/browser release checks.
 Preview: https://runctrl-git-feature-operations-v1-booking-3261s-projects.vercel.app/
 
 Intended production URL after validation: https://runctrl-vert.vercel.app/
@@ -22,7 +21,8 @@ Intended production URL after validation: https://runctrl-vert.vercel.app/
 
 ## Implemented workflows and protections
 
-- Google OAuth interface with a useful message if the provider is unavailable
+- Google OAuth using PKCE, with a useful message if the provider is unavailable
+- Active-session verification in RUNCTRL table and storage policies denies revoked sessions before JWT expiry
 - Current workspace roles: owner, editor, contributor and viewer
 - Contributor access requests load without membership; owner resolution grants the requested contributor/viewer role atomically, supports denial and blocks replay
 - Assignment creation, contributor requests, member selection, briefs, deadlines and status tracking
@@ -40,18 +40,19 @@ Intended production URL after validation: https://runctrl-vert.vercel.app/
 - Audit records for assignment status and access, membership, credential, asset and package decisions
 - Workspace changes clear previous records and forms; stale responses do not replace current workspace data
 
-## Verified November 5, 2026
+## Verified November 6, 2026
 
 - Production build: PASS
 - TypeScript: PASS
 - Workflow unit tests: 3 PASS
-- Hosted database role/RLS regression: 35 PASS, all fixtures rolled back
+- Hosted database role/RLS regression: 39 PASS, all fixtures rolled back
 - Live anonymous REST/RPC isolation: 8 PASS
 - Rollback cleanup: zero test users and zero test workspaces remain
 - Dependency audit: zero known vulnerabilities at verification time; versions and lockfile are committed
 - Security advisor: no RUNCTRL RLS/function warning; the existing shared-project warning is leaked-password protection disabled
-- Browser: preview loads with environment configuration; Google sign-in reaches Supabase and is blocked by disabled provider
-- Browser login, memberships, uploads, signed downloads, editorial review, responsive authenticated UI and production release: **NOT YET VERIFIED**
+- Browser: owner Google login, assignments, protected credential approval, private upload and signed download, rights clearance, package approval/upload lock, and workspace switching: PASS
+- PKCE sign-in, contributor onboarding and responsive release QA: pending
+- Production release: pending
 
 The database tests exercise real hosted Postgres permissions and triggers under `authenticated` with different user claims. Their storage rows are rollback-only fixtures; they do not establish that HTTP file uploads work. Do not represent database checks as completed browser end-to-end testing.
 
@@ -70,11 +71,11 @@ Google Cloud client settings:
 
 The two exact RUNCTRL root redirects are saved in Supabase's allowlist. The existing DSN Newsroom redirect and default Site URL remain intact. No wildcard redirect was added.
 
-**New signup remains disabled in the shared DSN project.** New contributors therefore need an invited/provisioned Supabase account before they can sign in and request workspace membership. Do not enable public signup for the shared project without reviewing DSN's existing invite-only boundary. Google setup alone does not change that onboarding restriction.
+Google and public signup are enabled in the shared project following the owner setup. A new Google identity still has no RUNCTRL membership until a workspace owner approves its request. Google OAuth currently uses testing mode; authorized test accounts may be required until its Google audience is published.
 
 ## Required release gate
 
-1. Enable Google through the owner credential handoff and test the intended existing owner login on Preview.
+1. Verify PKCE Google sign-in on Preview.
 2. Test no-member account request, owner approval/denial, contributor assignment request and editor assignment approval in the UI.
 3. Verify a real small test-file upload, metadata, private signed download, uncleared package rejection, rights clearance, approval and upload lock.
 4. Verify workspace switching, contributor/viewer restrictions, sign-out and fresh sign-in on desktop and mobile.
@@ -87,7 +88,7 @@ The two exact RUNCTRL root redirects are saved in Supabase's allowlist. The exis
 
 Copy `.env.example` into an ignored `.env.local` and use the project's public URL and publishable key only. `node tests/anonymous-api.mjs` checks the live anonymous boundary using `.env.local` and prints no key values.
 
-SQL source order matches hosted migrations: `supabase/operations_v1.sql`, `supabase/security_v2.sql`, `supabase/security_v3.sql`, `supabase/audit_v4.sql`. These target the existing shared DSN database, not a blank standalone database; do not rerun applied files. `supabase/schema.sql` is an older scaffold and is not the current operations schema.
+SQL source order matches hosted migrations: `supabase/operations_v1.sql`, `supabase/security_v2.sql`, `supabase/security_v3.sql`, `supabase/audit_v4.sql`, then `supabase/migrations/20261106074309_runctrl_session_security_v5.sql`. These target the existing shared DSN database, not a blank standalone database; do not rerun applied files. `supabase/schema.sql` is an older scaffold and is not the current operations schema.
 
 `tests/rls-regression.sql` runs in one transaction and rolls back all fixtures. Run only against the specified project with authorization. It never emails users, contacts hosts or publishes content.
 

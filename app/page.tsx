@@ -49,7 +49,7 @@ export default function Home(){
   const url=process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if(!url||!key){setNotice('Setup required: RUNCTRL database environment is not configured.');setLoading(false);return;}
-  const sb=createClient(url,key);
+  const sb=createClient(url,key,{auth:{flowType:'pkce',detectSessionInUrl:true}});
   setClient(sb);
   sb.auth.getUser().then(({data,error})=>{if(error&&error.name!=='AuthSessionMissingError')setNotice(error.message);setUser(data.user??null);setLoading(false)}).catch(e=>{setNotice(errorText(e));setLoading(false)});
   const {data:{subscription}}=sb.auth.onAuthStateChange((_event,session)=>setUser(session?.user??null));
