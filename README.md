@@ -19,7 +19,7 @@ Google OAuth remains in **Testing** mode, but RUNCTRL requests only basic identi
 - Repository: `dopevzn/RUNCTRL`, branch `feature/operations-v1`
 - Vercel: `runctrl`, `prj_JsIcZHw0Stz2nAq02E1LOph2gzxX`, team `booking-3261s-projects`
 - Supabase: DSN Newsroom, `kelzecdcnkeojdohpziy` (shared interim backend)
-- Eight RUNCTRL `rc_*` tables with RLS; private `runctrl-media` bucket
+- Nine RUNCTRL `rc_*` tables with RLS; private `runctrl-media` bucket
 - Preview and Production now have `NEXT_PUBLIC_SUPABASE_URL` and the current publishable key under `NEXT_PUBLIC_SUPABASE_ANON_KEY`, configured through the authorized Vercel GUI
 - No service-role/secret key is used by the application
 - The duplicate Vercel project `runctrl-9u2g` has not been changed or removed
@@ -37,7 +37,8 @@ Google OAuth remains in **Testing** mode, but RUNCTRL requests only basic identi
 - Marking a credential request sent requires owner attestation and an HTTPS evidence link; RUNCTRL sends no email
 - Credential status on assignments derives from the credential record
 - Rights-attested submission packages, private media uploads and signed downloads
-- Uploads limited to 50 MB per file; JPEG, PNG, WebP, TIFF, MP4 and QuickTime
+- Google Drive delivery for originals and large files, with editor-assigned folder, contributor manifest, and recorded editor completeness/rights verification
+- Optional direct review uploads limited to 50 MB per file; JPEG, PNG, WebP, TIFF, MP4 and QuickTime
 - Metadata must match an existing uploaded storage object; failed metadata registration attempts orphan cleanup
 - Asset clearance requires supporting rights notes; package approval requires at least one asset and all assets cleared
 - Approved packages reject new uploads and asset changes until reopened for revision
@@ -94,10 +95,20 @@ The database regression uses five temporary identities plus temporary workspaces
 
 Copy `.env.example` into an ignored `.env.local` and use the project's public URL and publishable key only. `node tests/anonymous-api.mjs` checks the live anonymous boundary using `.env.local` and prints no key values.
 
-SQL source order matches hosted migrations: `supabase/operations_v1.sql`, `supabase/security_v2.sql`, `supabase/security_v3.sql`, `supabase/audit_v4.sql`, then `supabase/migrations/20261106074309_runctrl_session_security_v5.sql`. These target the existing shared DSN database, not a blank standalone database; do not rerun applied files. `supabase/schema.sql` is an older scaffold and is not the current operations schema.
+SQL source order matches hosted migrations: `supabase/operations_v1.sql`, `supabase/security_v2.sql`, `supabase/security_v3.sql`, `supabase/audit_v4.sql`, then `supabase/migrations/20261106074309_runctrl_session_security_v5.sql`, then `supabase/migrations/20261106152321_runctrl_drive_delivery_v6.sql`. These target the existing shared DSN database, not a blank standalone database; do not rerun applied files. `supabase/schema.sql` is an older scaffold and is not the current operations schema.
 
 `tests/rls-regression.sql` runs in one transaction and rolls back all fixtures. Run only against the specified project with authorization. It never emails users, contacts hosts or publishes content.
 
 ## Operational limits
 
 RUNCTRL does not publish DSN content, send emails, process payments, license images or deliver RAW/large video. Rights notes record a human review; the application cannot independently establish legal ownership. Existing DSN Newsroom records are not imported. File cleanup is best effort if a network failure interrupts upload registration; administrators may need to reconcile unregistered storage objects. No production monitoring integration has been added.
+
+## Google Drive delivery workflow
+
+The owner selected the existing DOPE VZN Shared Drive under booking@dopevzn.com. A RUNCTRL library contains separate DSN, DOPE VZN and RecruitLook folders. Exact folder URLs are stored in the RLS-protected rc_storage_locations table and returned only to workspace editors/owners. No new Drive OAuth scopes, public sharing or automatic membership synchronization were added. Existing Shared Drive membership and inherited permissions still apply independently of RUNCTRL.
+
+Editors create an assignment delivery folder in Drive, use 01_ORIGINALS / 02_REVIEW / 03_DELIVERABLES / 04_RIGHTS, and set its URL on the assignment. Contributors upload with Drive or Drive for desktop, wait for completion, then submit a file count, total GB, manifest/notes and rights attestation in RUNCTRL. Large file bytes never pass through the app or Supabase.
+
+The server requires the exact assigned folder URL, rejects forged verification, keeps the submitted manifest immutable and requires a recorded editor completeness/rights check before approval. Revision clears the check. This is a Drive handoff and manual verification workflow, not an automatic Drive inventory, sync, checksum, proxy/transcoding or file-locking integration. Counts/sizes are contributor-reported; Drive files can change independently after approval. The editor must identify reviewed files/versions in the evidence and protect approved exports using Drive permissions.
+
+Google Workspace permits files up to 5 TB, subject to available storage and its 750 GB daily user upload/copy limit. No 50 GB-plus transfer has been tested through this workflow. The smoke test uses a clearly labeled synthetic image and no real production footage. Sources: https://developers.google.com/workspace/drive/api/guides/limits and https://support.google.com/a/users/answer/7338880 .
