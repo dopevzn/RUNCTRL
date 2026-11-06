@@ -12,7 +12,7 @@ The exact commit was exported from Git, built with Production settings using `--
 
 Preview: https://runctrl-git-feature-operations-v1-booking-3261s-projects.vercel.app/
 
-Google OAuth remains in **Testing** mode. Google requires completion of Branding before its app can be published; unrestricted onboarding has not been verified. The tested owner and contributor identities both work. RUNCTRL membership remains independently owner-approved.
+Google OAuth remains in **Testing** mode, but RUNCTRL requests only basic identity scopes (`openid`, email and profile), which Google exempts from the test-user allowlist restriction. First-time production signup was verified with `michael@dopetraining.com` on November 6, 2026: the account was created, a DSN contributor request was recorded, and the owner saw it in People. The account has zero memberships and its shared Newsroom profile remains inactive. Workspace access still requires owner approval. Google Workspace administrators can independently block OAuth apps. Reference: https://developers.google.com/identity/protocols/oauth2/production-readiness/overview
 
 ## Infrastructure
 
@@ -80,7 +80,7 @@ Google Cloud client settings:
 
 The two exact RUNCTRL root redirects are saved in Supabase's allowlist. The existing DSN Newsroom redirect and default Site URL remain intact. No wildcard redirect was added.
 
-Google and public signup are enabled in the shared project following the owner setup. A new Google identity still has no RUNCTRL membership until a workspace owner approves its request. Google OAuth currently uses testing mode; authorized test accounts may be required until its Google audience is published.
+Google and public signup are enabled in the shared project following the owner setup. A new Google identity still has no RUNCTRL membership until a workspace owner approves its request. Google OAuth uses Testing mode with basic identity scopes only; a Google test-user allowlist entry is not required for these scopes. The consent screen currently identifies the Supabase host rather than RUNCTRL; branded Google consent remains unfinished.
 
 ## Release validation
 
