@@ -4,10 +4,15 @@ Multi-workspace media operations for DOPE Sports Network, RecruitLook Hoops and 
 
 ## Current release state
 
-The feature branch builds and Google OAuth is enabled. Owner login, assignment and credential approval, private upload/download, rights clearance, package approval and workspace switching passed browser QA. Production remains gated on PKCE sign-in and contributor/browser release checks.
+RUNCTRL is deployed to Production at https://runctrl-vert.vercel.app/.
+
+Release commit: `86afda699b146a185e9d0a70fd3ccf9d3948a4ba`.
+Production deployment: `dpl_6eGG8hnDD8XUqN1SpWj4s2rwnNLT`.
+The exact commit was exported from Git, built with Production settings using `--skip-domain`, tested through the approved branch alias, then promoted without rebuilding. Domain assignment completed and live owner/contributor sign-in and private download were re-tested.
+
 Preview: https://runctrl-git-feature-operations-v1-booking-3261s-projects.vercel.app/
 
-Intended production URL after validation: https://runctrl-vert.vercel.app/
+Google OAuth remains in **Testing** mode. Google requires completion of Branding before its app can be published; unrestricted onboarding has not been verified. The tested owner and contributor identities both work. RUNCTRL membership remains independently owner-approved.
 
 ## Infrastructure
 
@@ -51,17 +56,21 @@ Intended production URL after validation: https://runctrl-vert.vercel.app/
 - Dependency audit: zero known vulnerabilities at verification time; versions and lockfile are committed
 - Security advisor: no RUNCTRL RLS/function warning; the existing shared-project warning is leaked-password protection disabled
 - Browser: owner Google login, assignments, protected credential approval, private upload and signed download, rights clearance, package approval/upload lock, and workspace switching: PASS
-- PKCE sign-in, contributor onboarding and responsive release QA: pending
-- Production release: pending
+- PKCE sign-in/sign-out with clean callback: PASS for owner and contributor
+- No-member request, owner approval, contributor assignment request/owner approval, and another workspace request/denial: PASS in browser
+- Contributor can see only DSN and its own assignment/package; owner private fixture remains hidden: PASS
+- Contributor real file upload, metadata registration, owner rights review, package approval and upload lock: PASS
+- Protected image download: PASS (320 × 180 synthetic PNG)
+- Authenticated phone layout: PASS at 390 × 844, no horizontal overflow for tested owner/contributor screens
+- Production staged/validated/promoted: PASS; production owner/contributor login, data, restrictions and download re-tested
+- Browser console: zero captured errors during staged/live checks
+- Vercel error/fatal runtime scan: no matching logs; this static client talks directly to Supabase, so this is not comprehensive monitoring
 
 The database tests exercise real hosted Postgres permissions and triggers under `authenticated` with different user claims. Their storage rows are rollback-only fixtures; they do not establish that HTTP file uploads work. Do not represent database checks as completed browser end-to-end testing.
 
-## Google OAuth handoff
+## Google OAuth configuration
 
-The Supabase Google configuration panel is prepared at:
-https://supabase.com/dashboard/project/kelzecdcnkeojdohpziy/auth/providers?provider=Google
-
-The account owner must enter the Google OAuth Web client ID and client secret directly in that panel, enable Google and save. Do not put the secret in chat, Git or Vercel public variables.
+Google is enabled in the intended Supabase project. Client credentials were entered by the account owner. Never put OAuth secrets in chat, Git, public environment variables, or screenshots.
 
 Google Cloud client settings:
 
@@ -73,14 +82,11 @@ The two exact RUNCTRL root redirects are saved in Supabase's allowlist. The exis
 
 Google and public signup are enabled in the shared project following the owner setup. A new Google identity still has no RUNCTRL membership until a workspace owner approves its request. Google OAuth currently uses testing mode; authorized test accounts may be required until its Google audience is published.
 
-## Required release gate
+## Release validation
 
-1. Verify PKCE Google sign-in on Preview.
-2. Test no-member account request, owner approval/denial, contributor assignment request and editor assignment approval in the UI.
-3. Verify a real small test-file upload, metadata, private signed download, uncleared package rejection, rights clearance, approval and upload lock.
-4. Verify workspace switching, contributor/viewer restrictions, sign-out and fresh sign-in on desktop and mobile.
-5. Stage the same reviewed commit as Production without domain assignment, verify it, then promote; keep deployment protection enabled.
-6. Re-test the protected production URL and inspect runtime errors.
+Owner and contributor workflows passed on the Preview build. The same source was staged with Production environment settings, then fresh login, contributor restrictions, package lock and protected download passed on that exact staged build. The build was promoted without rebuilding. Production domain assignment, fresh owner and contributor login, clean callbacks, data rendering and protected download passed afterward. Deployment protection remains enabled (`all_except_custom_domains`). No external credential emails or content publication occurred.
+
+The database regression uses five temporary identities plus temporary workspaces/sessions inside one rolled-back transaction. Browser tests used the real owner and owner-approved `booking@dopevzn.com` contributor, with two clearly labeled QA assignments/packages and two synthetic images. Those browser fixtures remain for inspection; the contributor membership remains active in DSN only. Its DOPE VZN access request was denied. Its shared DSN Newsroom profile remains inactive.
 
 ## Development and reproducibility
 
